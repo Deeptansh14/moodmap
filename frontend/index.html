@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MoodMap</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+      height: 130vh;
+
+    }
+
+    .header {
+      position: relative;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: linear-gradient(to right, #6EE7B7, #3B82F6);
+      color: white;
+      font-size: 1.5rem;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      gap: 1rem;
+    }
+
+    .center-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+
+    #user-display {
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+
+    #logout-button {
+      font-size: 0.9rem;
+      background-color: #ef4444;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+    }
+
+    #logout-button:hover {
+      background-color: #dc2626;
+    }
+ .cluster-tooltip {
+    background-color: white;
+    color: black;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+    .form-container {
+      padding: 1rem 2rem;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 1000;
+      gap: 1rem;
+    }
+
+    .form-container input,
+    .form-container button {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    .form-container input:focus {
+      outline: none;
+      border-color: #3B82F6;
+    }
+.blurred-blob {
+  filter: blur(8px);
+  mix-blend-mode: multiply;
+}
+
+    .form-container button {
+      background-color: #3B82F6;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .form-container button:hover {
+      background-color: #2563EB;
+    }
+
+    .emoji-option {
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s, background 0.2s;
+}
+
+/* Transparent pastel mood-based colors */
+.emoji-option[data-emoji="😢"] { background-color: rgba(144, 202, 249, 0.3); }  /* Sad - Soft Blue */
+.emoji-option[data-emoji="🤒"] { background-color: rgba(165, 214, 167, 0.3); }  /* Sick - Pale Green */
+.emoji-option[data-emoji="😰"] { background-color: rgba(179, 157, 219, 0.3); }  /* Anxious - Soft Purple */
+.emoji-option[data-emoji="😕"] { background-color: rgba(255, 224, 130, 0.3); }  /* Confused - Amber */
+.emoji-option[data-emoji="😴"] { background-color: rgba(176, 190, 197, 0.3); }  /* Tired - Grey */
+.emoji-option[data-emoji="😡"] { background-color: rgba(239, 83, 80, 0.3); }    /* Angry - Red */
+.emoji-option[data-emoji="❤️"] { background-color: rgba(240, 98, 146, 0.3); }  /* Love - Pink */
+.emoji-option[data-emoji="😎"] { background-color: rgba(77, 182, 172, 0.3); }  /* Confident - Teal */
+.emoji-option[data-emoji="😀"] { background-color: rgba(255, 235, 59, 0.3); }  /* Happy - Yellow */
+.emoji-option[data-emoji="🤩"] { background-color: rgba(255, 213, 79, 0.3); }  /* Excited - Gold */
+
+.emoji-option:hover {
+  transform: scale(1.2);
+  border-color: #333;
+}
+
+.emoji-option.selected {
+  border-color: #3B82F6;
+  background-color: rgba(59, 130, 246, 0.3); /* Light blue on selection */
+}
+
+
+
+    #map {
+      flex: 1;
+      width: 100%;
+    }
+
+    .emoji-marker {
+      font-size: 24px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 🌟 Header -->
+  <div class="header">
+    <div class="center-title">🌍 MoodMap - Share your Mood</div>
+    <div id="user-display"></div>
+    <button id="logout-button" onclick="logout()">Logout</button>
+  </div>
+
+  <!-- 😊 Mood Submission Form -->
+  <div class="form-container">
+    <form id="moodForm" style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+      <div id="emoji-options" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;">
+    <button type="button" class="emoji-option" data-emoji="😀">😀</button>
+    <button type="button" class="emoji-option" data-emoji="😢">😢</button>
+    <button type="button" class="emoji-option" data-emoji="😡">😡</button>
+    <button type="button" class="emoji-option" data-emoji="😰">😰</button>
+    <button type="button" class="emoji-option" data-emoji="🤩">🤩</button>
+    <button type="button" class="emoji-option" data-emoji="😴">😴</button>
+    <button type="button" class="emoji-option" data-emoji="❤️">❤️</button>
+    <button type="button" class="emoji-option" data-emoji="🤒">🤒</button>
+    <button type="button" class="emoji-option" data-emoji="😎">😎</button>
+    <button type="button" class="emoji-option" data-emoji="😕">😕</button>
+
+      </div>
+      <input type="hidden" id="emoji" required />
+      <input type="text" id="message" placeholder="Optional message" />
+      <button type="submit">Post Mood</button>
+    </form>
+  </div>
+
+  <!-- 🗺️ Map -->
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+  <script>
+    const token = localStorage.getItem('moodmap_token');
+    if (!token) {
+        alert("Session expired. Please log in.");
+        window.location.href = "login.html";
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Show username in header
+      const username = localStorage.getItem('moodmap_user');
+      if (username) {
+        document.getElementById('user-display').textContent = `👤 @${username}`;
+      }
+
+      // Emoji selection logic
+      const emojiButtons = document.querySelectorAll('.emoji-option');
+      const emojiInput = document.getElementById('emoji');
+
+      emojiButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          emojiButtons.forEach(b => b.classList.remove('selected'));
+          button.classList.add('selected');
+          emojiInput.value = button.textContent;
+        });
+      });
+    });
+
+    // Logout handler
+    function logout() {
+        localStorage.removeItem('moodmap_user');
+        localStorage.removeItem('moodmap_token');  // ✅ Clear token too
+        window.location.href = 'login.html';
+    }
+
+
+    // Initialize map
+    const map = L.map('map', {
+      center: [20, 0],
+      zoom: 2,
+      minZoom: 2,
+      maxZoom: 12
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Fetch and render all moods
+    fetch('http://localhost:8080/all_moods', {
+  headers: {
+    'Authorization': 'Bearer ' + token
+  }
+})
+      .then(res => res.json())
+      .then(moods => {
+  // Group by cluster ID and emoji
+  const clusters = {};
+  moods.forEach(mood => {
+    const key = `${mood.cluster_id || -1}_${mood.emoji}`;
+    if (!clusters[key]) clusters[key] = [];
+    clusters[key].push(mood);
+  });
+
+  const emojiColorMap = {
+    "😢": "#90caf9",
+    "🤒": "#a5d6a7",
+    "😰": "#b39ddb",
+    "😕": "#ffe082",
+    "😴": "#b0bec5",
+    "😡": "#ef5350",
+    "❤️": "#f06292",
+    "😎": "#4db6ac",
+    "😀": "#ffeb3b",
+    "🤩": "#ffd54f"
+  };
+
+  for (const key in clusters) {
+    const group = clusters[key];
+    const [clusterId, emoji] = key.split("_");
+    const color = emojiColorMap[emoji] || "#888";
+
+    // Draw circle (filled blob)
+    const avgLat = group.reduce((sum, m) => sum + m.lat, 0) / group.length;
+    const avgLng = group.reduce((sum, m) => sum + m.lng, 0) / group.length;
+
+// Utility to compute convex hull
+function convexHull(points) {
+  points.sort((a, b) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
+
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower = [];
+  for (let p of points) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper = [];
+  map.createPane('blurPane');
+map.getPane('blurPane').style.filter = 'blur(6px)';
+map.getPane('blurPane').style.mixBlendMode = 'multiply';
+
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+const points = group.map(m => [m.lng, m.lat]);
+if (points.length >= 2) {
+  const hullPoints = convexHull(points).map(p => [p[1], p[0]]);  // flip back to [lat, lng] for Leaflet
+  const blob = L.polygon(hullPoints, {
+    pane: 'blurPane', 
+    stroke: false,
+    fillColor: color,
+    fillOpacity: 1
+  }).addTo(map);
+
+  blob.bindTooltip(
+    `${emoji} x ${group.length} mood${group.length > 1 ? 's' : ''}`,
+    { permanent: false, direction: 'top', className: 'cluster-tooltip' }
+  );
+} else {
+  // fallback if not enough points for a hull
+  const fallback = L.circle(points[0], {
+    radius: 10000,
+    fillColor: color,
+    color: color,
+    fillOpacity: 0.4
+  }).addTo(map);
+  fallback.bindTooltip(
+    `${emoji} x ${group.length} mood${group.length > 1 ? 's' : ''}`,
+    { permanent: false, direction: 'top', className: 'cluster-tooltip' }
+  );
+}
+
+
+    // Add individual emoji markers inside the group
+    group.forEach(mood => {
+      const icon = L.divIcon({
+        html: `<div class="emoji-marker">${mood.emoji}</div>`,
+        className: 'custom-div-icon',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+
+      const marker = L.marker([mood.lat, mood.lng], { icon }).addTo(map);
+      marker.bindPopup(`<b>@${mood.username}</b><br><i>${mood.message || 'ㅤ'}</i>`);
+    });
+  }
+});
+
+
+    // Round location for privacy
+    function getRoundedCoords(position) {
+  const baseLat = Math.round(position.coords.latitude * 10) / 10;
+  const baseLng = Math.round(position.coords.longitude * 10) / 10;
+
+  // Small random jitter between -0.02 and 0.02
+  const jitterLat = 0;
+  const jitterLng = 0;
+
+
+  const lat = baseLat + jitterLat;
+  const lng = baseLng + jitterLng;
+
+  return { lat, lng };
+}
+
+
+    // Handle form submission
+    document.getElementById('moodForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const emoji = document.getElementById('emoji').value;
+      const message = document.getElementById('message').value;
+      const username = localStorage.getItem('moodmap_user');
+
+      if (!username) {
+        alert("Please log in first.");
+        window.location.href = "login.html";
+        return;
+      }
+
+      if (!emoji) {
+        alert("Please select a mood emoji.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async position => {
+        const { lat, lng } = getRoundedCoords(position);
+
+        const body = {
+          emoji,
+          message,
+          lat,
+          lng
+        };
+
+        await fetch('http://localhost:8080/mood', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token  // ✅ Important
+            },
+            body: JSON.stringify({ emoji, message, lat, lng })
+        });
+
+        alert("Mood posted!");
+        location.reload();
+      }, err => {
+        alert("Location access needed to post mood.");
+      });
+    });
+  </script>
+  <!-- 📘 About Section -->
+<footer style="padding: 2rem; background: #f9fafb; text-align: center; font-size: 0.95rem; color: #4b5563; border-top: 1px solid #e5e7eb;">
+  <h3 style="margin-bottom: 0.5rem; color: #111827;">🌍 About MoodMap</h3>
+  <p style="max-width: 700px; margin: auto;">
+    MoodMap is a location-based mood sharing platform where users post how they feel using emojis and optional messages.
+    These moods are anonymously shown on a live map, forming colorful blobs and emoji clusters to reflect how different regions are feeling in real-time.
+  </p>
+  <p style="margin-top: 1rem; font-size: 0.9rem;">
+    Built using Go, PostgreSQL, Leaflet.js, and Gin.
+  </p>
+</footer>
+
+</body>
+
+</html>
